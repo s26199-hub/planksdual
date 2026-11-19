@@ -17,7 +17,7 @@ n();})();
    - 운 요소 0 · 모든 조건 대칭 · 오직 실력
    - 로컬 2인 / 봇 연습 / 방 코드 온라인 (락스텝 동기화)
    ========================================================= */
-const BUILD='pvp-2.11';
+const BUILD='pvp-2.12';
 const W=960,H=540,FLOOR=440;
 const FONT='system-ui,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif';
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -45,7 +45,7 @@ window.addEventListener('resize',resize);window.addEventListener('orientationcha
 const APP={scene:'menu',mode:'bot',paused:false,showHelp:false,joinCode:'',
   cfg:{map:0,bo:2,w:[0,1],bot:1},      // bo = 먼저 N라운드 이기면 승리
   S:null,bots:[null,null],result:null,leaveArm:0,acc:0,rematch:[false,false],oppLeft:false,
-  sk:[[],[]],ranked:false,rdy:[false,false],rkGoT:0,rkRes:null,rkWhy:''};
+  sk:[[],[]],ranked:false,rdy:[false,false],rkGoT:0,rkRes:null,rkWhy:'',coinGot:0,coinDone:0};
 
 /* ---------- 소리 ---------- */
 let AC=null,muted=false;const lastSfx={};
@@ -660,7 +660,7 @@ function leaveNet(sayBye){
   LS.on=false;
   setTimeout(()=>{try{if(c)c.close();}catch(e){}try{if(p)p.destroy();}catch(e){}},60);
 }
-const sendRk=()=>{net.rkSent=true;netSend({t:'rk',rp:RK.rp,sk:RK.sk.join('')});};
+const sendRk=()=>{net.rkSent=true;netSend({t:'rk',rp:RK.rp,sk:skStr(RK.sk),n:RK.name,id:RK.id,c:RK.coin});};
 function sendCfg(){if(net.role==='host')netSend({t:'cfg',c:{map:APP.cfg.map,bo:APP.cfg.bo,w:[APP.cfg.w[0],APP.cfg.w[1]]}});}
 function onPeerGone(){
   net.connected=false;net.conn=null;
@@ -668,7 +668,7 @@ function onPeerGone(){
   if(APP.ranked){
     const S=APP.S;APP.rkWhy='';
     if(APP.scene==='play'&&S&&S.phase!=='mend'&&RK.pend){
-      if(net.byeRecv){APP.rkRes=rkSettle(1);APP.rkWhy='상대가 나가서 승리로 처리됐어요';}
+      if(net.byeRecv){APP.rkRes=rkSettle(1);rkCoinWin();APP.rkWhy='상대가 나가서 승리로 처리됐어요';}
       else{RK.pend=0;rkSave();APP.rkWhy='연결이 끊겨서 점수 변동 없이 끝났어요';}
     }
     rkGone();
@@ -798,14 +798,14 @@ function lsPump(dt){
 function resetMatchUI(){aimReset();APP.endT=0;APP.paused=false;APP.rematch=[false,false];APP.oppLeft=false;APP.leaveArm=0;fxReset();}
 function startLocal(mode){
   APP.mode=mode;APP.cfg.w=[clamp(APP.cfg.w[0],0,WP.length-1),clamp(APP.cfg.w[1],0,WP.length-1)];
-  APP.S=initSim(APP.cfg);APP.bots=[null,mode==='bot'?botMk(APP.cfg.bot):null];APP.acc=0;APP.sk=[RK.sk.slice(),WP.map(()=>0)];
+  APP.S=initSim(APP.cfg);APP.bots=[null,mode==='bot'?botMk(APP.cfg.bot):null];APP.acc=0;APP.sk=[RK.sk.slice(),WP.map(()=>0)];APP.coinDone=0;APP.coinGot=0;
   resetMatchUI();clearLatch();APP.scene='play';
 }
 function startOnline(cfg,D,slot){
   APP.mode=slot===0?'host':'guest';APP.cfg={map:cfg.map,bo:cfg.bo,w:[cfg.w[0],cfg.w[1]],bot:1};
   APP.S=initSim(APP.cfg);lsInit(D,slot);LS.acc=0;net.D=D;
   const mine=RK.sk.slice(),th=(net.oppSk&&net.oppSk.length===WP.length)?net.oppSk:WP.map(()=>0);APP.sk=slot===0?[mine,th]:[th,mine];
-  APP.rkRes=null;APP.rkWhy='';if(APP.ranked)rkStartMark();
+  APP.rkRes=null;APP.rkWhy='';APP.coinDone=0;APP.coinGot=0;if(APP.ranked)rkStartMark();
   resetMatchUI();clearLatch();APP.scene='play';
 }
 function startMatch(){
@@ -1356,23 +1356,40 @@ const SKINS=[
   {n:'기본 스킨',t:-1,desc:'기본 모양'},
   {n:'골드 세트',t:2,lo:[110,70,0],hi:[255,238,150],glow:'#ffcf40',desc:'금빛 도금 총 · 황금빛 탄'},
   {n:'다이아 세트',t:3,lo:[15,85,150],hi:[210,248,255],glow:'#7df9ff',desc:'수정빛 총 · 반짝이는 탄'},
-  {n:'레전드 세트',t:4,rainbow:1,glow:'#ff9ff3',desc:'무지개빛 총 · 전설의 탄'}];
-const RK={rp:0,w:0,l:0,st:0,best:0,sk:[],pend:0,pendOpp:0};
+  {n:'레전드 세트',t:4,rainbow:1,glow:'#ff9ff3',desc:'무지개빛 총 · 전설의 탄'},
+  {n:'민트 사탕',box:1,r:0,lo:[0,110,90],hi:[190,255,235],glow:'#5fffd0',desc:'시원한 민트빛'},
+  {n:'체리 레드',box:1,r:0,lo:[120,0,20],hi:[255,190,190],glow:'#ff5a6a',desc:'새빨간 체리빛'},
+  {n:'라벤더',box:1,r:0,lo:[70,40,130],hi:[235,215,255],glow:'#c9a0ff',desc:'은은한 보랏빛'},
+  {n:'네온 라임',box:1,r:1,lo:[20,90,0],hi:[230,255,120],glow:'#b6ff3a',desc:'형광 연두빛'},
+  {n:'노을',box:1,r:1,lo:[130,30,60],hi:[255,220,120],glow:'#ff9a5a',desc:'붉게 물든 노을빛'},
+  {n:'심해',box:1,r:1,lo:[0,30,90],hi:[120,210,255],glow:'#3aa0ff',desc:'깊은 바다빛'},
+  {n:'흑요석',box:1,r:2,lo:[10,10,20],hi:[150,130,200],glow:'#8a5aff',desc:'검은 유리에 보랏빛 테두리'},
+  {n:'용암',box:1,r:2,lo:[90,10,0],hi:[255,200,60],glow:'#ff5a1a',desc:'이글거리는 용암빛'},
+  {n:'오로라',box:1,r:3,rainbow:2,glow:'#7dffc8',desc:'일렁이는 오로라빛'}];
+const RAR=[{n:'일반',c:'#8fa08a'},{n:'희귀',c:'#4f9dd9'},{n:'에픽',c:'#a55be0'},{n:'신화',c:'#f0a020'}];
+const skStr=a=>a.map(v=>String.fromCharCode(48+v)).join('');
+const RK={rp:0,w:0,l:0,st:0,best:0,sk:[],pend:0,pendOpp:0,coin:0,own:[],id:'',name:'',book:[]};
 for(let i=0;i<WP.length;i++)RK.sk.push(0);
 const tierIdx=rp=>{let t=0;for(let i=0;i<TIERS.length;i++)if(rp>=TIERS[i].rp)t=i;return t;};
-const skinOk=s=>s===0||(SKINS[s]&&RK.best>=SKINS[s].t);
+const skinOk=s=>{if(s===0)return true;const S=SKINS[s];if(!S)return false;return S.box?RK.own.indexOf(s)>=0:RK.best>=S.t;};
 function rkSave(){try{localStorage.setItem('cbduo_rk1',JSON.stringify(RK));}catch(e){}}
 function rkLoad(){
   try{
     const o=JSON.parse(localStorage.getItem('cbduo_rk1')||'null');
     if(o&&typeof o==='object'){
       RK.rp=clamp(o.rp|0,0,9999);RK.w=clamp(o.w|0,0,99999);RK.l=clamp(o.l|0,0,99999);RK.st=clamp(o.st|0,0,999);
+      RK.coin=clamp(o.coin|0,0,99999999);RK.own=Array.isArray(o.own)?o.own.map(v=>v|0).filter(v=>v>0&&v<SKINS.length&&SKINS[v].box):[];
+      RK.id=typeof o.id==='string'?o.id.slice(0,12):'';RK.name=typeof o.name==='string'?o.name.slice(0,8):'';
+      RK.book=Array.isArray(o.book)?o.book.slice(0,60).filter(e=>e&&typeof e.id==='string').map(e=>({id:e.id.slice(0,12),n:String(e.n||'').slice(0,8),rp:clamp(e.rp|0,0,9999),c:clamp(e.c|0,0,99999999),t:e.t|0})):[];
       RK.best=clamp(Math.max(o.best|0,tierIdx(RK.rp)),0,TIERS.length-1);RK.pend=o.pend?1:0;RK.pendOpp=clamp(o.pendOpp|0,0,9999);
       if(Array.isArray(o.sk))for(let i=0;i<WP.length;i++){const v=o.sk[i]|0;RK.sk[i]=(v>=0&&v<SKINS.length&&skinOk(v))?v:0;}
     }
   }catch(e){}
 }
 rkLoad();
+if(!RK.id)RK.id=Math.random().toString(36).slice(2,10);
+if(!RK.name)RK.name='플레이어'+(((Math.random()*9000)|0)+1000);
+rkSave();
 const RKUI={toast:'',skW:0,msg:''};
 // 대결 도중 창을 닫았으면 패배 처리 (다음 접속 때)
 if(RK.pend){rkSettle(0);RKUI.toast='지난 랭크전을 도중에 나가서 패배로 기록됐어요';}
@@ -1386,7 +1403,7 @@ function rkSettle(win){
   RK.rp=clamp(RK.rp+d,0,9999);d=RK.rp-rp0;
   const t1=tierIdx(RK.rp);if(t1>RK.best)RK.best=t1;
   RK.pend=0;rkSave();
-  const un=[];for(let s=1;s<SKINS.length;s++)if(SKINS[s].t>b0&&SKINS[s].t<=RK.best)un.push(s);
+  const un=[];for(let s=1;s<SKINS.length;s++)if(!SKINS[s].box&&SKINS[s].t>b0&&SKINS[s].t<=RK.best)un.push(s);
   return{win,d,rp0,rp1:RK.rp,t0,t1,un};
 }
 function rkStartMark(){RK.pend=1;RK.pendOpp=net.opp?net.opp.rp:RK.rp;rkSave();}
@@ -1406,6 +1423,7 @@ function skinMap(v,S){
   else if(v.length===4){r=parseInt(v.charAt(1),16)*17;g=parseInt(v.charAt(2),16)*17;b=parseInt(v.charAt(3),16)*17;}
   else return v;
   const L=(r*.3+g*.59+b*.11)/255;
+  if(S.rainbow===2)return'hsl('+((((150+Math.sin(ANIM*2+L*4)*75)+360)%360)|0)+',90%,'+((38+L*34)|0)+'%)';
   if(S.rainbow)return'hsl('+(((ANIM*140+L*220)%360)|0)+',92%,'+((36+L*34)|0)+'%)';
   const k=v+S.n;if(_skc[k])return _skc[k];
   const m=(i)=>(S.lo[i]+(S.hi[i]-S.lo[i])*L)|0;
@@ -1480,7 +1498,9 @@ function rkHostConn(conn){
 }
 function rkParseOpp(m){
   const sk=[];const s=String(m.sk||'');for(let i=0;i<WP.length;i++){const v=(s.charCodeAt(i)||48)-48;sk.push(v>=0&&v<SKINS.length?v:0);}
-  return{rp:clamp(m.rp|0,0,9999),sk};
+  const o={rp:clamp(m.rp|0,0,9999),sk,n:String(m.n||'').replace(/[\u0000-\u001f<>]/g,'').slice(0,8),id:String(m.id||'').replace(/[^a-z0-9]/gi,'').slice(0,12),c:clamp(m.c|0,0,99999999)};
+  rkMeet(o);
+  return o;
 }
 function rkHostMsg(conn,m){
   if(!m||typeof m!=='object')return;
@@ -1546,7 +1566,7 @@ function rkConnMsg(conn,m,slot){
 function rkJoin(room){
   if(!room||!room.conn||!room.conn.open||RKS.joining)return;
   RKS.joining=room.conn;RKS.msg='입장하는 중...';
-  try{room.conn.send({t:'rjoin',b:BUILD,rp:RK.rp,sk:RK.sk.join('')});}catch(e){RKS.joining=null;return;}
+  try{room.conn.send({t:'rjoin',b:BUILD,rp:RK.rp,sk:skStr(RK.sk),n:RK.name,id:RK.id,c:RK.coin});}catch(e){RKS.joining=null;return;}
   setTimeout(()=>{if(RKS.joining===room.conn){RKS.joining=null;RKS.msg='응답이 없어요. 다시 시도해 주세요';}},6000);
 }
 function rkEnterLobby(conn,slot){
@@ -1580,8 +1600,8 @@ function drawRk(){
   rpBar(70,272,340,20,RK.rp);
   txt(nx?'다음 티어 '+nx.n+'까지 '+(nx.rp-RK.rp)+' RP':'최고 티어예요!',240,312,14,'#5a3a1e');
   txt('전적 '+RK.w+'승 '+RK.l+'패'+(RK.st>=2?' · '+RK.st+'연승 중':''),240,340,16,'#3b2210',null,'800');
-  const own=[];for(let s=1;s<SKINS.length;s++)if(skinOk(s))own.push(SKINS[s].n);
-  txt('해금한 스킨: '+(own.length?own.join(', '):'아직 없어요 (골드 골판지부터)'),240,372,13,'#5a3a1e');
+  const own=[];for(let s=1;s<SKINS.length;s++)if(!SKINS[s].box&&skinOk(s))own.push(SKINS[s].n);
+  txt('티어 스킨: '+(own.length?own.join(', '):'아직 없어요 (골드 골판지부터)'),240,372,13,'#5a3a1e');
   txt('이긴 만큼 오르고, 지면 내려가요 · 대결 도중에 나가면 패배',240,396,12,'#7a5a3a');
   if(RKUI.toast)txt(RKUI.toast,240,420,13,'#b3261e',null,'800');
   rkPanel(490,84,430,360);
@@ -1598,7 +1618,7 @@ function drawRk(){
   }
   btn(40,456,210,56,'방 만들기',rkCreateRoom,{icon:'host',size:22,col:'#8fd18a',dark:'#5a9c55'});
   btn(262,456,210,56,'방 찾기',()=>{leaveNet(false);APP.ranked=true;APP.scene='rkrooms';rkScanStart();},{icon:'join',size:22});
-  btn(490,456,430,56,'무기 스킨 장착',()=>{APP.scene='rkskin';},{size:22,col:'#e9c8ff',dark:'#a97fd0'});
+  btn(490,456,430,56,'랭킹 보기',()=>{RKUI.bk='rk';APP.scene='board';},{size:22,col:'#ffe08a',dark:'#d1a23a'});
 }
 
 /* ---------- 방 목록 ---------- */
@@ -1677,35 +1697,160 @@ function drawRkLobby(){
 function gunPreview(x,y,w,sk,sc,ax){
   ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);drawGun({w,ax:ax||1,face:1,sk});ctx.restore();
 }
+function coinIcon(x,y,r){
+  ctx.save();ctx.fillStyle='#ffd34d';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.lineWidth=Math.max(2,r*.16);ctx.strokeStyle='#a8741a';ctx.stroke();
+  ctx.fillStyle='#fff1a8';ctx.beginPath();ctx.arc(x-r*.25,y-r*.3,r*.3,0,7);ctx.fill();
+  txt('C',x,y+r*.08,r*1.2,'#a8741a',null,'900');ctx.restore();
+}
+function coinPill(x,y,w,h,n,col){
+  ctx.fillStyle='rgba(50,25,8,.6)';rr(x,y,w,h,h/2);ctx.fill();coinIcon(x+h/2,y+h/2,h*.36);
+  txt(String(n),x+w-12,y+h/2+1,Math.min(20,h*.6),col||'#fff','right','900');
+}
 function drawRkSkin(){
   ctx.drawImage(bgc,0,0);motes();
-  rkBack(()=>{APP.scene='rk';});
+  rkBack(()=>{APP.scene='menu';});
   txt('무기 스킨',W/2,36,36,'#fff',null,'900',{w:9,c:'#6b2a14'});
-  rkPanel(30,76,372,364);
-  txt('무기 고르기',216,96,15,'#6b4423',null,'900');
+  coinPill(W-190,14,172,34,RK.coin);
+  rkPanel(30,70,330,400);
+  txt('무기 고르기',195,90,15,'#6b4423',null,'900');
   for(let w=0;w<WP.length;w++){
-    const x=42+(w%3)*120,y=108+((w/3)|0)*44,sel=RKUI.skW===w;
-    btn(x,y,114,38,'',()=>{RKUI.skW=w;},{sel,col:sel?'#ffe9b8':'#ead0a0',dark:sel?'#d4a954':'#b98448',r:9,lip:3});
-    ctx.fillStyle=WCOL[w];ctx.beginPath();ctx.arc(x+12,y+19,5,0,7);ctx.fill();
-    const nm=WP[w].n;txt(nm,x+22,y+18,nm.length>=6?10:(nm.length>=5?11:12),'#3b2210','left','800');
-    if(RK.sk[w]>0)txt('★ '+SKINS[RK.sk[w]].n.slice(0,2),x+22,y+31,9,'#b0188f','left','800');
+    const x=40+(w%3)*104,y=102+((w/3)|0)*50,sel=RKUI.skW===w;
+    btn(x,y,98,44,'',()=>{RKUI.skW=w;},{sel,col:sel?'#ffe9b8':'#ead0a0',dark:sel?'#d4a954':'#b98448',r:9,lip:3});
+    ctx.fillStyle=WCOL[w];ctx.beginPath();ctx.arc(x+11,y+17,4.5,0,7);ctx.fill();
+    const nm=WP[w].n;txt(nm,x+20,y+16,nm.length>=6?9:(nm.length>=5?10:12),'#3b2210','left','800');
+    if(RK.sk[w]>0)txt('★ '+SKINS[RK.sk[w]].n.slice(0,4),x+8,y+34,9,'#b0188f','left','800');
   }
-  rkPanel(416,76,514,364);
+  rkPanel(374,70,556,400);
   const w=RKUI.skW;
-  txt(WP[w].n+' 스킨',673,96,15,'#6b4423',null,'900');
+  txt(WP[w].n+' 스킨 · 보유 '+(1+SKINS.filter((q,i)=>i>0&&skinOk(i)).length)+'/'+SKINS.length,652,90,15,'#6b4423',null,'900');
   for(let s=0;s<SKINS.length;s++){
-    const x=428+(s%2)*250,y=108+((s/2)|0)*130,ok=skinOk(s),eq=RK.sk[w]===s;
-    btn(x,y,242,122,'',()=>{if(ok){RK.sk[w]=s;rkSave();}},{sel:eq,enabled:ok,col:eq?'#ffe9b8':'#fff3d6',dark:eq?'#d4a954':'#c9ae78',r:12,lip:4});
-    ctx.save();if(!ok)ctx.globalAlpha=.55;
-    gunPreview(x+40,y+50,w,s,1.5);
-    txt(SKINS[s].n,x+121,y+92,16,'#3b2210',null,'900');
-    txt(ok?SKINS[s].desc:'🔒 '+TIERS[SKINS[s].t].n+' 달성 시 해금',x+121,y+110,11,ok?'#5a3a1e':'#b3261e',null,'700');
+    const x=386+(s%4)*136,y=100+((s/4)|0)*70,ok=skinOk(s),eq=RK.sk[w]===s,S=SKINS[s];
+    btn(x,y,130,64,'',()=>{if(ok){RK.sk[w]=s;rkSave();}},{sel:eq,enabled:ok,col:eq?'#ffe9b8':'#fff3d6',dark:eq?'#d4a954':'#c9ae78',r:10,lip:3});
+    ctx.save();if(!ok)ctx.globalAlpha=.5;
+    gunPreview(x+36,y+22,w,s,1.1);
+    txt(S.n,x+65,y+43,12,'#3b2210',null,'900');
+    const lab=ok?(S.box?RAR[S.r].n:(s?'티어 보상':'기본')):(S.box?'🔒 상자에서 획득':'🔒 '+TIERS[S.t].n.slice(0,2)+' 달성');
+    txt(lab,x+65,y+56,10,ok?(S.box?RAR[S.r].c:'#5a3a1e'):'#b3261e',null,'800');
     ctx.restore();
-    if(eq)txt('장착 중',x+226,y+14,12,'#d9332b','right','900');
+    if(S.box){ctx.fillStyle=RAR[S.r].c;rr(x+6,y+6,8,8,4);ctx.fill();}
+    if(eq)txt('장착',x+124,y+12,10,'#d9332b','right','900');
   }
   const best=RK.sk[w];
-  btn(428,372,492,56,'이 스킨을 모든 무기에 장착',()=>{if(skinOk(best)){for(let i=0;i<WP.length;i++)RK.sk[i]=best;rkSave();}},{size:20,enabled:skinOk(best)&&best>0,col:'#e9c8ff',dark:'#a97fd0'});
-  drawRobot({id:0,x:116,y:424,face:1,ax:1,ay:0,dashT:0,w,lock:0,onG:1,run:0,ko:false,pT:0,label:'',me:false,sk:RK.sk[w]});
+  btn(386,392,260,60,'이 스킨을 모든 무기에',()=>{if(skinOk(best)){for(let i=0;i<WP.length;i++)RK.sk[i]=best;rkSave();}},{size:15,enabled:skinOk(best)&&best>0,col:'#e9c8ff',dark:'#a97fd0'});
+  btn(656,392,262,60,'스킨 상자 사러 가기',()=>{SHOP.res=null;APP.scene='shop';},{size:17,col:'#ffe08a',dark:'#d1a23a'});
+  drawRobot({id:0,x:110,y:440,face:1,ax:1,ay:0,dashT:0,w,lock:0,onG:1,run:0,ko:false,pT:0,label:'',me:false,sk:RK.sk[w]});
+}
+
+/* ---------- 코인 · 스킨 상자 ---------- */
+const BOXES=[
+  {n:'일반 상자',p:150,c:'#c49a62',d:'#8a6a3c',odds:[70,25,5,0]},
+  {n:'희귀 상자',p:400,c:'#7fc0f0',d:'#3a7bb0',odds:[0,60,35,5]},
+  {n:'전설 상자',p:900,c:'#ff9be6',d:'#a548c8',odds:[0,0,70,30]}];
+const REFUND=[30,80,200,500];
+const SHOP={res:null,t:0,msg:''};
+function rkCoinWin(){
+  let n=0;const m=APP.mode;
+  if(m==='host'||m==='guest')n=APP.ranked?50:30;else if(m==='bot')n=[4,8,12][APP.cfg.bot|0]||4;
+  if(n>0){RK.coin+=n;rkSave();}
+  APP.coinGot=n;APP.coinDone=1;return n;
+}
+function buyBox(i){
+  const B=BOXES[i];if(!B||RK.coin<B.p||(SHOP.res&&performance.now()-SHOP.t<1500))return;
+  RK.coin-=B.p;
+  let roll=Math.random()*100,r=0,acc=0;for(let q=0;q<4;q++){acc+=B.odds[q];if(roll<acc){r=q;break;}}
+  const pool=[];for(let s=1;s<SKINS.length;s++)if(SKINS[s].box&&SKINS[s].r===r)pool.push(s);
+  const s=pool[(Math.random()*pool.length)|0],dup=RK.own.indexOf(s)>=0;
+  if(dup)RK.coin+=REFUND[r];else RK.own.push(s);
+  rkSave();SHOP.res={s,dup,refund:dup?REFUND[r]:0,box:i};SHOP.t=performance.now();
+}
+function drawBoxArt(x,y,w,B,shake,open){
+  ctx.save();ctx.translate(x,y);ctx.rotate(shake);
+  const h=w*.7;
+  ctx.fillStyle='rgba(50,25,8,.25)';rr(-w/2+4,6,w,h,10);ctx.fill();
+  ctx.fillStyle=B.c;rr(-w/2,0,w,h,10);ctx.fill();ctx.lineWidth=4;ctx.strokeStyle='#6b4423';ctx.stroke();
+  ctx.save();rr(-w/2,0,w,h,10);ctx.clip();ctx.strokeStyle='rgba(60,30,10,.16)';ctx.lineWidth=3;for(let i=-w/2;i<w/2;i+=11){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,h);ctx.stroke();}ctx.restore();
+  ctx.fillStyle=B.d;ctx.fillRect(-w*.09,0,w*.18,h);
+  ctx.fillStyle=B.d;rr(-w/2-4,open?-h*.3:-8,w+8,h*.22,6);ctx.fill();ctx.stroke();
+  txt('?',0,h*.52,h*.45,'#fff',null,'900',{w:5,c:'#5a3418'});
+  ctx.restore();
+}
+function drawShop(){
+  ctx.drawImage(bgc,0,0);motes();
+  rkBack(()=>{APP.scene='rkskin';},'스킨으로');
+  txt('스킨 상자',W/2,36,36,'#fff',null,'900',{w:9,c:'#6b2a14'});
+  coinPill(W-190,14,172,34,RK.coin);
+  const own=SKINS.filter((q,i)=>q.box&&skinOk(i)).length,tot=SKINS.filter(q=>q.box).length;
+  txt('코인은 이기면 모여요 · 랭크전 +50 / 온라인 +30 / 봇 +4~12 · 상자 스킨 수집 '+own+'/'+tot,W/2,70,14,'#fff',null,'700',{w:4,c:'rgba(60,30,10,.7)'});
+  const opening=SHOP.res&&performance.now()-SHOP.t<1400;
+  for(let i=0;i<3;i++){
+    const B=BOXES[i],x=40+i*300,y=88,can=RK.coin>=B.p&&!SHOP.res;
+    rkPanel(x,y,280,370);
+    drawBoxArt(x+140,y+60,120,B,0,false);
+    txt(B.n,x+140,y+170,24,'#3b2210',null,'900');
+    let ly=y+200;
+    for(let q=3;q>=0;q--){if(!B.odds[q])continue;ctx.fillStyle=RAR[q].c;rr(x+60,ly-8,14,14,4);ctx.fill();txt(RAR[q].n+' 스킨',x+82,ly,14,'#3b2210','left','800');txt(B.odds[q]+'%',x+222,ly,14,'#5a3a1e','right','900');ly+=24;}
+    txt('이미 가진 스킨은 코인으로 돌려받아요',x+140,y+300,11,'#7a5a3a');
+    btn(x+30,y+316,220,44,'',()=>buyBox(i),{enabled:can,col:'#8fd18a',dark:'#5a9c55',r:12});
+    coinIcon(x+70,y+338,11);txt(B.p+' 코인으로 열기',x+160,y+339,16,'#3b2210',null,'900');
+  }
+  if(RK.coin<150&&!SHOP.res)txt('코인이 부족해요 — 대결에서 이기면 모을 수 있어요',W/2,484,15,'#fff',null,'800',{w:4,c:'rgba(60,30,10,.7)'});
+  if(SHOP.res){
+    const R=SHOP.res,el=performance.now()-SHOP.t;
+    ctx.fillStyle='rgba(30,16,6,.72)';ctx.fillRect(0,0,W,H);
+    if(el<1400){drawBoxArt(W/2,170,170,BOXES[R.box],Math.sin(el/40)*.09*(1-el/1400),el>1100);txt('두근두근...',W/2,360,26,'#fff',null,'900');}
+    else{
+      const S=SKINS[R.s];
+      rkPanel(W/2-230,100,460,330);
+      ctx.fillStyle=RAR[S.r].c;rr(W/2-70,84,140,34,17);ctx.fill();txt(RAR[S.r].n,W/2,101,18,'#fff',null,'900');
+      txt(S.n,W/2,160,34,'#3b2210',null,'900');txt(S.desc,W/2,192,14,'#5a3a1e');
+      ctx.save();ctx.translate(W/2-50,260);ctx.scale(2.4,2.4);const on=skinBegin(R.s);drawGunRaw({w:RKUI.skW,ax:1,face:1});skinEnd(on);ctx.restore();
+      txt(R.dup?'이미 가진 스킨! +'+R.refund+' 코인 돌려받았어요':'새 스킨을 얻었어요!',W/2,324,16,R.dup?'#7a5a3a':'#2e8b4a',null,'900');
+      if(!R.dup)btn(W/2-210,344,200,54,'바로 장착',()=>{RK.sk[RKUI.skW]=R.s;rkSave();SHOP.res=null;},{size:19,col:'#e9c8ff',dark:'#a97fd0'});
+      btn(R.dup?W/2-100:W/2+10,344,200,54,'확인',()=>{SHOP.res=null;},{size:20,col:'#8fd18a',dark:'#5a9c55'});
+    }
+  }
+}
+
+/* ---------- 랭킹 (내가 만난 플레이어들) ---------- */
+function rkRename(){
+  try{const v=window.prompt('이름 (최대 8글자)',RK.name);if(v!==null){const t=v.replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,8);if(t){RK.name=t;rkSave();}}}catch(e){}
+}
+function rkMeet(o){
+  if(!o||!o.id||o.id===RK.id)return;
+  let e=null;for(const q of RK.book)if(q.id===o.id)e=q;
+  if(!e){e={id:o.id};RK.book.push(e);}
+  e.n=o.n||'이름 없음';e.rp=o.rp;e.c=o.c;e.t=Date.now();
+  if(RK.book.length>60){RK.book.sort((a,b)=>b.t-a.t);RK.book.length=60;}
+  rkSave();
+}
+function drawBoard(){
+  ctx.drawImage(bgc,0,0);motes();
+  rkBack(()=>{APP.scene=RKUI.bk||'menu';});
+  txt('랭킹',W/2,36,36,'#fff',null,'900',{w:9,c:'#6b2a14'});
+  const tab=RKUI.tab|0;
+  btn(250,66,230,44,'경쟁전 점수',()=>{RKUI.tab=0;},{size:18,sel:tab===0,col:tab===0?'#ffe9b8':'#ead0a0',dark:'#b98448',r:12,lip:4});
+  btn(490,66,230,44,'코인',()=>{RKUI.tab=1;},{size:18,sel:tab===1,col:tab===1?'#ffe9b8':'#ead0a0',dark:'#b98448',r:12,lip:4});
+  rkPanel(110,124,740,320);
+  const all=[{id:RK.id,n:RK.name,rp:RK.rp,c:RK.coin,me:1}].concat(RK.book);
+  all.sort((a,b)=>tab?(b.c-a.c||b.rp-a.rp):(b.rp-a.rp||b.c-a.c));
+  const myRank=all.findIndex(e=>e.me)+1;
+  const rows=all.slice(0,6);if(myRank>6)rows[5]=all[myRank-1];
+  rows.forEach((e,i)=>{
+    const rank=e.me?myRank:i+1,y=134+i*50;
+    ctx.fillStyle=e.me?'#fff1b8':'#fff8e6';rr(122,y,716,44,10);ctx.fill();ctx.lineWidth=e.me?3:2;ctx.strokeStyle=e.me?'#d9332b':'#6b4423';ctx.stroke();
+    const mc=['#ffd34d','#d5dde6','#cd8a4a'][rank-1];
+    if(mc){ctx.fillStyle=mc;ctx.beginPath();ctx.arc(152,y+22,15,0,7);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#6b4423';ctx.stroke();}
+    txt(String(rank),152,y+23,mc?17:16,'#3b2210',null,'900');
+    tierBadge(204,y+22,16,tierIdx(e.rp));
+    txt(e.n+(e.me?' (나)':''),236,y+16,17,'#3b2210','left','900');
+    txt(TIERS[tierIdx(e.rp)].n,236,y+34,11,'#7a5a3a','left','700');
+    if(tab){coinIcon(668,y+22,12);txt(String(e.c),826,y+23,22,'#b0481f','right','900');}
+    else{txt(e.rp+' RP',826,y+23,22,'#b0481f','right','900');}
+  });
+  if(all.length<2)txt('온라인으로 대결하면 상대가 이 랭킹에 나타나요',480,300,16,'#7a5a3a',null,'800');
+  txt('온라인으로 만난 플레이어들끼리의 랭킹이에요 (이 기기에 저장 · 상대가 알려 준 값 기준)',480,462,13,'#fff',null,'700',{w:4,c:'rgba(60,30,10,.7)'});
+  btn(40,474,200,50,'이름 바꾸기',rkRename,{size:18,col:'#f1d9a8',dark:'#c9ae78'});
+  txt('내 이름: '+RK.name,260,499,15,'#fff','left','800',{w:4,c:'rgba(60,30,10,.7)'});
 }
 
 /* ---------- 결과 화면에 붙는 랭크 상자 ---------- */
@@ -1760,8 +1905,12 @@ function drawMenu(){
   btn(bx,408,bw,50,'봇 연습',()=>{leaveNet(false);APP.mode='bot';APP.scene='lobby';},{icon:'bot',size:21,sub:'혼자서 연습해요'});
   btn(24,474,52,46,'',()=>{APP.showHelp=true;},{icon:'help',col:'#f1d9a8',dark:'#c9ae78',r:12});
   btn(86,474,52,46,'',()=>{muted=!muted;},{icon:muted?'mute':'sound',col:'#f1d9a8',dark:'#c9ae78',r:12});
+  btn(150,474,120,46,'스킨',()=>{leaveNet(false);RKUI.skW=Math.min(RKUI.skW,WP.length-1);APP.scene='rkskin';},{size:19,col:'#e9c8ff',dark:'#a97fd0',r:12});
+  btn(280,474,120,46,'상자',()=>{leaveNet(false);SHOP.res=null;APP.scene='shop';},{size:19,col:'#ffe08a',dark:'#d1a23a',r:12});
+  btn(410,474,120,46,'랭킹',()=>{leaveNet(false);RKUI.bk='menu';APP.scene='board';},{size:19,col:'#b8e6ff',dark:'#6fb0d8',r:12});
+  coinPill(W-190,14,172,34,RK.coin);
   if(canFS)btn(W-76,474,52,46,'',toggleFS,{icon:'full',col:'#f1d9a8',dark:'#c9ae78',r:12});
-  txt('v2.11 · 랜덤 없음 · 모든 조건 대칭',W/2,H-20,13,'#f7e3bd');
+  txt('v2.12 · 랜덤 없음 · 모든 조건 대칭',W/2+150,H-20,13,'#f7e3bd');
   if(APP.showHelp)drawHelp();
 }
 function drawHelp(){
@@ -1899,6 +2048,7 @@ function drawResult(){
   const pct=i=>S.st.sh[i]?Math.round(100*S.st.ht[i]/S.st.sh[i])+'%':'-';
   const dm=i=>String(Math.round(S.st.dm[i]));
   statRow(y+148,'라운드 승',String(S.score[0]),String(S.score[1]),S.score[0]>S.score[1]?0:(S.score[1]>S.score[0]?1:-1));
+  if(APP.coinGot>0){coinPill(x+w-132,y+46,120,26,'+'+APP.coinGot,'#ffe08a');}
   const rk=APP.ranked&&APP.rkRes;
   if(!rk)statRow(y+190,'명중률',pct(0),pct(1),(S.st.sh[0]&&S.st.sh[1])?(S.st.ht[0]/S.st.sh[0]>S.st.ht[1]/S.st.sh[1]?0:1):-1);
   statRow(rk?y+190:y+232,'가한 피해',dm(0),dm(1),S.st.dm[0]>S.st.dm[1]?0:(S.st.dm[1]>S.st.dm[0]?1:-1));
@@ -1952,6 +2102,8 @@ function draw(){
     case'rkrooms':drawRkRooms();break;
     case'rkskin':drawRkSkin();break;
     case'rklobby':drawRkLobby();break;
+    case'shop':drawShop();break;
+    case'board':drawBoard();break;
     default:drawArena();if(APP.scene==='result')drawResult();if(APP.oppLeft)drawOppLeft();
   }
   ctx.restore();
@@ -1991,6 +2143,7 @@ function update(dt){
         APP.scene='result';
         const me=APP.mode==='guest'?1:0;
         if(APP.ranked&&!APP.rkRes&&RK.pend)APP.rkRes=rkSettle(S.winner<0?-1:(S.winner===me?1:0));
+        if(!APP.coinDone&&S.winner>=0&&APP.mode!=='local'&&S.winner===me)rkCoinWin();APP.coinDone=1;
         if(S.winner<0)playSfx('beep');else if(APP.mode==='local'||S.winner===me)playSfx('win');else playSfx('lose');
       }
     }
